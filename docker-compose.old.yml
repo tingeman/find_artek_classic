@@ -1,0 +1,40 @@
+# This is a docker compose file that uses Dockerfile.old to build a complete image
+# to run the Find Artek project.
+#
+# Specialized docker-compose file for development environment using "manage.py runserver" command
+# This file is used to start the development server and the database server
+#
+# The development server is started with the command:
+# docker compose -f docker-compose.old.yml up -d
+#
+
+services:
+  webapp-find-artek-classic:
+    restart: always
+    container_name: webapp-find-artek-classic
+    build:
+      context: .
+      dockerfile: Dockerfile.old
+    volumes:
+      - ../00_static_data/find_artek_static:/mnt/shared-project-data
+      - ./app-classic/find_artek/find_artek.sqlite:/app/find_artek.sqlite
+    ports:
+      - "8089:8089"
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - LDAP_PASSWORD=${LDAP_PASSWORD}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DEBUG=${DEBUG:-true}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      - SPATIALITE_LIBRARY_PATH=${SPATIALITE_LIBRARY_PATH:-/usr/local/lib/mod_spatialite.so}
+    stdin_open: true
+    tty: true
+    command: bash -c 'cd /app && python manage.py runserver 0.0.0.0:8089 --settings find_artek.settings'
+    networks:
+      - shared_network
+
+
+
+networks:
+  shared_network:
+    external: true

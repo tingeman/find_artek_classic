@@ -1,0 +1,169 @@
+# Optimized Dockerfile using pysqlite2 with minimal custom compilation
+# Only compiles: SQLite (with extensions), SpatiaLite, and pysqlite2
+FROM debian:jessie
+
+ARG USERNAME=dockeruser
+ARG USER_UID=30000
+ARG USER_GID=$USER_UID
+
+# Fix sources for archived Jessie
+RUN sed -i 's|http://deb.debian.org/debian|http://archive.debian.org/debian|g' /etc/apt/sources.list && \
+    sed -i 's|http://security.debian.org/debian-security|http://archive.debian.org/debian-security|g' /etc/apt/sources.list && \
+    sed -i '/jessie-updates/d' /etc/apt/sources.list && \
+    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/99no-check-valid-until
+
+# Install Python 2.7 and most dependencies from Debian packages
+RUN apt-get update && apt-get install -y --allow-unauthenticated --no-install-recommends \
+    # Python and build tools
+    python2.7 \
+    python2.7-dev \
+    python-pip \
+    build-essential \
+    gcc \
+    binutils \
+    wget \
+    pkg-config \
+    # Geospatial libraries (prebuilt - we'll replace GDAL later)
+    libgeos-3.4.2 \
+    libgeos-dev \
+    libproj-dev \
+    libproj0 \
+    libxml2-dev \
+    # FreeXL (prebuilt)
+    libfreexl-dev \
+    libfreexl1 \
+    # Other dependencies
+    libldap2-dev \
+    libsasl2-dev \
+    libssl-dev \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libffi-dev \
+    # Runtime tools
+    locales \
+    sudo \
+    bash \
+    nano \
+    net-tools \
+    mc \
+    curl \
+    tree \
+    iputils-ping \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Remove system SQLite to avoid conflicts
+RUN apt-get remove -y libsqlite3-0 libsqlite3-dev sqlite3 || true
+RUN rm -rf /usr/include/sqlite3* /usr/lib/x86_64-linux-gnu/libsqlite3* /usr/bin/sqlite3
+
+# Set up Python 2.7 as default
+RUN ln -sf /usr/bin/python2.7 /usr/bin/python
+
+# Fix pip for Debian Jessie
+RUN curl -o get-pip.py https://bootstrap.pypa.io/pip/2.7/get-pip.py && \
+    python get-pip.py && \
+    rm get-pip.py
+
+# Build custom SQLite with extension loading support
+WORKDIR /tmp
+RUN wget https://www.sqlite.org/2024/sqlite-autoconf-3450200.tar.gz \
+    && tar xzf sqlite-autoconf-3450200.tar.gz \
+    && cd sqlite-autoconf-3450200 \
+    && CFLAGS="-DSQLITE_ENABLE_LOAD_EXTENSION -O2" \
+       CPPFLAGS="-DSQLITE_ENABLE_LOAD_EXTENSION" \
+       ./configure --prefix=/usr/local --enable-static=no \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/sqlite-autoconf-3450200*
+
+# Verify SQLite installation
+RUN /usr/local/bin/sqlite3 --version && \
+    echo 'SELECT 1;' | /usr/local/bin/sqlite3 ':memory:' && \
+    ln -sf /usr/local/bin/sqlite3 /usr/bin/sqlite3
+
+# Build SpatiaLite against our custom SQLite
+WORKDIR /tmp
+RUN wget https://www.gaia-gis.it/gaia-sins/libspatialite-sources/libspatialite-4.3.0a.tar.gz \
+    && tar xzf libspatialite-4.3.0a.tar.gz \
+    && cd libspatialite-4.3.0a \
+    && PKG_CONFIG_PATH="/usr/local/lib/pkgconfig:$PKG_CONFIG_PATH" \
+       CPPFLAGS="-I/usr/local/include" \
+       LDFLAGS="-L/usr/local/lib -L/usr/lib/x86_64-linux-gnu" \
+       LIBS="-lfreexl" \
+       ./configure --prefix=/usr/local --disable-freexl \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig \
+    && rm -rf /tmp/libspatialite-4.3.0a*
+
+# Test SpatiaLite loading
+RUN /usr/local/bin/sqlite3 ':memory:' "SELECT load_extension('/usr/local/lib/mod_spatialite'); SELECT spatialite_version();"
+
+# Set library path to prioritize our custom SQLite
+ENV LD_LIBRARY_PATH="/usr/local/lib:/usr/lib/x86_64-linux-gnu:/usr/lib"
+
+# Create symlinks for Django's SpatiaLite backend to find our library
+RUN ln -sf /usr/local/lib/mod_spatialite.so /usr/lib/x86_64-linux-gnu/mod_spatialite.so && \
+    ln -sf /usr/local/lib/libspatialite.so /usr/lib/x86_64-linux-gnu/libspatialite.so && \
+    ln -sf /usr/local/lib/libspatialite.so.7 /usr/lib/x86_64-linux-gnu/libspatialite.so.7
+
+# Install pysqlite2 with our custom SQLite
+RUN CPPFLAGS="-I/usr/local/include" \
+    LDFLAGS="-L/usr/local/lib" \
+    pip install pysqlite
+
+# Copy test scripts
+COPY test_scripts/test_pysqlite.py /tmp/test_pysqlite.py
+COPY test_scripts/test_django.py /tmp/test_django.py
+COPY test_scripts/test_db_module.py /tmp/test_db_module.py
+
+# Test pysqlite2 with extension loading
+RUN python /tmp/test_pysqlite.py
+
+# Configure locale and environment
+RUN sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen && \
+    dpkg-reconfigure --frontend=noninteractive locales && \
+    update-locale LC_ALL=en_US.UTF-8
+
+ENV LC_ALL=en_US.UTF-8
+ENV LANG=en_US.UTF-8
+ENV LANGUAGE=en_US.UTF-8
+ENV LD_LIBRARY_PATH=/usr/local/lib
+
+# Install Python dependencies
+COPY ./app-classic/find_artek/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
+
+# Test Django spatialite import
+RUN python /tmp/test_db_module.py
+
+# Create user and setup application
+RUN adduser --disabled-password --home /home/$USERNAME --uid $USER_UID $USERNAME && \
+    mkdir -p /app && \
+    chown $USER_UID:$USER_GID /app && \
+    chmod -R 755 /app && \
+    echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Test SpatiaLite functionality one more time
+RUN python /tmp/test_pysqlite.py
+
+# Clean up
+RUN rm -rf /tmp/* /var/tmp/* && \
+    apt-get clean
+
+# Switch to non-root user
+USER $USERNAME
+WORKDIR /app
+
+# Copy application
+COPY --chown=$USERNAME:$USERNAME ./app-classic/find_artek /app
+
+# Copy test script for final Django test
+COPY test_scripts/test_django.py /app/test_django_final.py
+
+# Final test of Django with spatial database - with environment properly set
+RUN python test_django_final.py
+
+CMD ["/bin/bash"]

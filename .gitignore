@@ -1,0 +1,225 @@
+# ==============================================
+# .gitignore for Find Artek Django Project
+# ==============================================
+
+# ============ CRITICAL SECURITY ============
+# Database files - NEVER commit databases with user data
+*.sqlite
+*.sqlite3
+*.db
+db.sqlite3
+find_artek.sqlite
+find_artek_backup_*.sqlite
+*backup*.sqlite
+
+# Django settings and secrets
+local_settings.py
+settings_local.py
+.env
+.env.local
+.env.production
+.env.development
+secrets.json
+secret_key.txt
+
+# Include environment template file
+!.env.example
+
+# ============ DJANGO SPECIFIC ============
+# Compiled Python files
+*.pyc
+*.pyo
+__pycache__/
+*.so
+.Python
+
+# Django logs and cache
+*.log
+*.pot
+.cache/
+.sessions/
+*.cache
+
+# Static files (collected)
+staticfiles/
+static_collected/
+*/static_collected/
+static_root/
+
+# Media files (user uploads) - may contain sensitive archaeological data
+media/
+*/media/
+app-classic/find_artek/media/
+uploads/
+*/uploads/
+user_files/
+
+# ============ PYTHON DEVELOPMENT ============
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+htmlcov/
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# ============ DOCKER ============
+.dockerignore
+docker-compose.override.yml
+.env.docker
+docker-compose.prod.yml
+docker-compose.local.yml
+
+# ============ ARCHAEOLOGICAL DATA SECURITY ============
+# Sensitive archaeological site data
+site_coordinates/
+archaeological_data/
+feature_locations/
+sensitive_locations/
+coordinates/
+site_data/
+
+# Excel files with potential sensitive data
+*.xlsx
+*.xls
+# But keep template/example files
+!*template*.xlsx
+!*example*.xls*
+!*sample*.xls*
+
+# Geographic data files that might contain sensitive coordinates
+*.shp
+*.kml
+*.kmz
+*.gpx
+*.geojson
+# But keep example/template files
+!*template*.shp
+!*example*.geojson
+
+# ============ DEVELOPMENT TOOLS ============
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ============ WEB ASSETS ============
+# Node.js (if using frontend build tools)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Webpack bundles
+/static/webpack_bundles/
+/static/js/bundle.js
+/static/css/bundle.css
+
+# ============ BACKUP FILES ============
+*.bak
+*.tmp
+*.temp
+*~
+.#*
+\#*#
+
+# Log files
+logs/
+*/logs/
+
+# ============ PYTHON TOOLS ============
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+
+# Translations (if regenerating)
+*.mo
+
+# ============ CONFIGURATION FILES ============
+# Configuration files that might contain secrets
+config.ini
+config.cfg
+settings.cfg
+
+# Local development overrides
+local_docker_compose.yml
+
+# ============ PROJECT SPECIFIC ============
+# Find Artek specific files that might contain sensitive data
+publications_fileobject_assoc.json
+publications.txt
+
+# Multiuploader temporary files
+multiuploader_temp/
+
+# Report files and appendices (may contain sensitive research)
+reports/
+appendices/
+
+# Any export files
+exports/
+data_exports/
+
+# ============ NOTES ============
+# If you have documentation with sensitive information
+sensitive_docs/
+internal_notes/
+research_notes/
+
+# Personal notes that shouldn't be shared
+NOTES.md
+TODO_PERSONAL.md
+SECRETS.md
